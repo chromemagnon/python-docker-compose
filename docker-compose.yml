@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  rabbit-server:
+    image: rabbitmq:3.12.10-management
+    hostname: rabbit
+    container_name: rabbit-server
+    ports:
+      - "15672:15672" # Management console
+      - "5672:5672"   # RabbitMQ server
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: kLPZNDwHXfw0G9vr0KPmb2c9AMGWVBV3oCui5ISCw5Y
+      MYSQL_DATABASE: iotdb
+      MYSQL_USER: iotuser
+      MYSQL_PASSWORD: zVzyUFaxM7VApEP0thJi1IzdV4AAx4Mffan74ZU70sd
+      MYSQL_LOG_CONSOLE: 'true'
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./initdb:/docker-entrypoint-initdb.d
+      - ./mysql-logs:/var/log/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root --password=kLPZNDwHXfw0G9vr0KPmb2c9AMGWVBV3oCui5ISCw5Y"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  iot-consumer:
+    image: iot-consumer:1.0.0
+    depends_on:
+      rabbit-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+  iot-publisher:
+    image: iot-publisher:1.0.0
+    ports:
+      - "5000:5000"
+    environment:
+      FLASK_HOST: "0.0.0.0"
+      FLASK_PORT: "5000"
+      FLASK_DEBUG: False
+      RABBITMQ_HOST: rabbit-server
+    depends_on:
+      rabbit-server:
+        condition: service_healthy
+
+volumes:
+  mysql-data:
+
